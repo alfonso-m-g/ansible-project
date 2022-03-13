@@ -1,31 +1,32 @@
 -
-  name: 'DB - Install mariadb'
+  name: 'Deploy pre-requisites'
   hosts: target2
   tasks:
-    - name: 'Install Maria DB'
-      become: yes
+    - name: 'Install firewalld'
+      command: apt-get install -y firewalld
+
+    - name: 'Start firewalld service'
+      command: service firewalld start
+
+    - name: 'Enable firewalld service'
+      command: systemctl enable firewalld
+
+-
+  name: 'DB - Install mysql'
+  hosts: target2
+  tasks:
+    - name: 'Install MySQL'
       command: apt-get install -y mariadb-server
       args:
         warn: false
 
-    - name: 'Start mariadb service'
-      become: yes
+    - name: 'Start mysql service'
       command: service mariadb start
 
-    - name: 'Enable mariadb'
-      become: yes
+    - name: 'Enable mysql'
       command: systemctl enable mariadb
 
--
-  name: 'DB - Configure firewall for database'
-  hosts: target2
-  tasks:
-    - name: 'Install firewalld'
-      become: yes
-      command: 'apt-get install -y firewalld'
-
     - name: 'Configure firewall'
-      become: yes
       command: firewall-cmd --permanent --zone=public --add-port=3306/tcp
       command: firewall-cmd --reload
 
@@ -34,19 +35,16 @@
   hosts: target2
   tasks:
     - name: 'Install dependencies'
-      become: yes
-      command: apt-get install python3-pip
-      command: pip install pymysql
+      pip:
+        name: pymysql
 
     - name: 'Create database'
-      become: yes
       mysql_db:
         login_unix_socket: /var/run/mysqld/mysqld.sock
         name: ecomdb
         state: present        
     
     - name: 'Create user'
-      become: yes
       mysql_user:
         login_unix_socket: /var/run/mysqld/mysqld.sock
         name: ecomuser
@@ -58,11 +56,10 @@
     - name: 'Load Product Inventory Information to database'
       ansible.builtin.copy:
         src: ./db-load-script.sql
-        dest: /home/pachi
+        dest: /home/ubuntu
 
     - name: 'Load script'
-      become: yes
-      shell: mysql < db-load-script.sql
+      shell: mysql < /home/ubuntu/db-load-script.sql
       ignore_errors: yes
 
 -
@@ -70,22 +67,18 @@
   hosts: target2
   tasks:
     - name: 'Install required packages'
-      become: yes
       command: apt-get install -y apache2 php php-mysql
 
     - name: 'Configure firewall port 80'
-      become: yes
       command: firewall-cmd --permanent --zone=public --add-port=80/tcp
       command: firewall-cmd --reload
   
     - name: 'Add line to /etc/apache2/apache2.conf'
-      become: yes
       lineinfile:
         path: /etc/apache2/apache2.conf
         line: ServerName 127.0.0.1
         
     - name: 'Configure apache2'
-      become: yes
       command: sed -i 's/index.html/index.php/g' /etc/apache2/apache2.conf
 
     - name: 'Start apache2'
@@ -94,7 +87,6 @@
         state: started
 
     - name: 'Enable apache2'
-      become: yes
       command: systemctl enable apache2
 
     - name: 'Install git'
@@ -103,20 +95,22 @@
         state: present
 
     - name: 'Empty working directory'
-      become: yes
       file:
         path: /var/www/html
         state: absent
 
     - name: 'Download code'
-      become: yes
       git:
         repo: https://github.com/kodekloudhub/learning-app-ecommerce
         dest: /var/www/html/
 
     - name: 'Update index.php file'
-      become: yes
       command: "sed -i 's/172.20.1.101/localhost/g' /var/www/html/index.php"
 
-    - name: 'Test app'
+    - name: 'Install curl'
+      apt:
+        name: curl
+        state: present
+
+    - name: 'Test app'    
       command: curl http://localhost
