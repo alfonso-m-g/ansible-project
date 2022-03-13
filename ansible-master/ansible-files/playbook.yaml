@@ -1,19 +1,26 @@
 -
   name: 'Deploy pre-requisites'
-  hosts: target2
+  hosts: all
+  vars:
+    run: 'no'
   tasks:
     - name: 'Install firewalld'
       command: apt-get install -y firewalld
+      when: run == 'yes'
 
     - name: 'Start firewalld service'
       command: service firewalld start
+      when: run == 'yes'
 
     - name: 'Enable firewalld service'
       command: systemctl enable firewalld
+      when: run == 'yes'
 
 -
   name: 'DB - Install mysql'
-  hosts: target2
+  hosts: all
+  vars:
+    run: 'no'
   tasks:
     - name: 'Install MySQL'
       command: apt-get install -y mariadb-server
@@ -29,10 +36,11 @@
     - name: 'Configure firewall'
       command: firewall-cmd --permanent --zone=public --add-port=3306/tcp
       command: firewall-cmd --reload
+      when: run == 'yes'
 
 -
   name: 'DB - Configure database'
-  hosts: target2
+  hosts: all
   tasks:
     - name: 'Install dependencies'
       pip:
@@ -64,7 +72,9 @@
 
 -
   name: 'Deploy and configure web'
-  hosts: target2
+  hosts: all
+  vars:
+    run: 'no'
   tasks:
     - name: 'Install required packages'
       command: apt-get install -y apache2 php php-mysql
@@ -72,6 +82,7 @@
     - name: 'Configure firewall port 80'
       command: firewall-cmd --permanent --zone=public --add-port=80/tcp
       command: firewall-cmd --reload
+      when: run == 'yes'
   
     - name: 'Add line to /etc/apache2/apache2.conf'
       lineinfile:
